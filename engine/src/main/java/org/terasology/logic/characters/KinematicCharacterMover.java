@@ -18,13 +18,15 @@ package org.terasology.logic.characters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.entitySystem.entity.EntityRef;
-import org.terasology.logic.characters.events.FootstepEvent;
 import org.terasology.logic.characters.events.HorizontalCollisionEvent;
-import org.terasology.logic.characters.events.JumpEvent;
 import org.terasology.logic.characters.events.OnEnterBlockEvent;
-import org.terasology.logic.characters.events.SwimStrokeEvent;
 import org.terasology.logic.characters.events.VerticalCollisionEvent;
+import org.terasology.logic.characters.movement.MovementMechanics;
+import org.terasology.logic.characters.movement.MovementProvider;
+import org.terasology.logic.characters.movement.StateIndependentMovementProvider;
+import org.terasology.logic.characters.movement.VanillaGroundMovement;
 import org.terasology.logic.location.LocationComponent;
+import org.terasology.math.JomlUtil;
 import org.terasology.math.TeraMath;
 import org.terasology.math.Vector3fUtil;
 import org.terasology.math.geom.ImmutableVector3f;
@@ -88,10 +90,14 @@ public class KinematicCharacterMover implements CharacterMover {
     private float steppedUpDist;
     private WorldProvider worldProvider;
     private PhysicsEngine physics;
+    private MovementProvider movementProvider;
 
     public KinematicCharacterMover(WorldProvider wp, PhysicsEngine physicsEngine) {
         this.worldProvider = wp;
         physics = physicsEngine;
+
+        MovementMechanics movement = new VanillaGroundMovement();
+        movementProvider = new StateIndependentMovementProvider(movement);
     }
 
     @Override
@@ -581,73 +587,18 @@ public class KinematicCharacterMover implements CharacterMover {
 
     private void walk(final CharacterMovementComponent movementComp, final CharacterStateEvent state,
                       CharacterMoveInputEvent input, EntityRef entity) {
-        Vector3f desiredVelocity = new Vector3f(input.getMovementDirection());
+        MovementMechanics movementMechanics = movementProvider.getMovementMechanicsForState(state);
+        Vector3f endVelocity = JomlUtil.from(movementMechanics.step(state, input, entity));
+        Vector3f moveDelta = new Vector3f(endVelocity).scale(input.getDelta());
 
-        float lengthSquared = desiredVelocity.lengthSquared();
-
-        // If the length of desired movement is > 1, normalise it to prevent movement being faster than allowed.
-        // (Desired velocity < 1 is allowed, as the character may wish to walk/crawl/otherwise move slowly)
-        if (lengthSquared > 1) {
-            desiredVelocity.normalize();
-        }
-        desiredVelocity.scale(movementComp.speedMultiplier);
-
-        float maxSpeed = getMaxSpeed(entity, movementComp);
-        if (input.isRunning()) {
-            maxSpeed *= movementComp.runFactor;
-        }
-
-        // As we can't use it, remove the y component of desired movement while maintaining speed.
-        if (movementComp.grounded && desiredVelocity.y != 0) {
-            float speed = desiredVelocity.length();
-            desiredVelocity.y = 0;
-            if (desiredVelocity.x != 0 || desiredVelocity.z != 0) {
-                desiredVelocity.normalize();
-                desiredVelocity.scale(speed);
-            }
-        }
-        desiredVelocity.scale(maxSpeed);
-
-        if (movementComp.mode == MovementMode.CLIMBING) {
-            climb(state, input, desiredVelocity);
-        }
-
-        // If swimming or diving, cancel double jump to avoid jumping underwater and on the surface
-        if (movementComp.mode == MovementMode.SWIMMING || movementComp.mode == MovementMode.DIVING) {
-            movementComp.numberOfJumpsLeft = 0;
-        }
-
-        // Modify velocity towards desired, up to the maximum rate determined by friction
-        Vector3f velocityDiff = new Vector3f(desiredVelocity);
-        velocityDiff.sub(state.getVelocity());
-        velocityDiff.scale(Math.min(movementComp.mode.scaleInertia * input.getDelta(), 1.0f));
-        Vector3f endVelocity = new Vector3f(state.getVelocity());
-        endVelocity.x += velocityDiff.x;
-        endVelocity.z += velocityDiff.z;
-        if (movementComp.mode.scaleGravity == 0) {
-            // apply the velocity without gravity
-            endVelocity.y += velocityDiff.y;
-        } else if (movementComp.mode.applyInertiaToVertical) {
-            endVelocity.y += Math.max(-TERMINAL_VELOCITY, velocityDiff.y - (GRAVITY * movementComp.mode.scaleGravity) * input.getDelta());
-        } else {
-            endVelocity.y = Math.max(-TERMINAL_VELOCITY, state.getVelocity().y - (GRAVITY * movementComp.mode.scaleGravity) * input.getDelta());
-        }
-        Vector3f moveDelta = new Vector3f(endVelocity);
-        moveDelta.scale(input.getDelta());
         CharacterCollider collider = movementComp.mode.useCollision ? physics.getCharacterCollider(entity) : null;
         MoveResult moveResult = move(state.getPosition(), moveDelta,
                 (state.getMode() != MovementMode.CLIMBING && state.isGrounded() && movementComp.mode.canBeGrounded) ? movementComp.stepHeight : 0,
                 movementComp.slopeFactor, collider);
-        Vector3f distanceMoved = new Vector3f(moveResult.getFinalPosition());
-        distanceMoved.sub(state.getPosition());
+        Vector3f distanceMoved = new Vector3f(moveResult.getFinalPosition()).sub(state.getPosition());
         state.getPosition().set(moveResult.getFinalPosition());
         if (input.isFirstRun() && distanceMoved.length() > 0) {
             entity.send(new MovedEvent(new ImmutableVector3f(distanceMoved), new ImmutableVector3f(state.getPosition())));
-        }
-
-        // Upon hitting solid ground, reset the number of jumps back to the maximum value.
-        if (state.isGrounded()) {
-            movementComp.numberOfJumpsLeft = movementComp.numberOfJumpsMax;
         }
 
         if (moveResult.isBottomHit()) {
@@ -662,27 +613,6 @@ public class KinematicCharacterMover implements CharacterMover {
                 movementComp.numberOfJumpsLeft = movementComp.numberOfJumpsMax;
             }
             endVelocity.y = 0;
-
-            // Jumping is only possible, if the entity is standing on ground
-            if (input.isJumpRequested()) {
-
-                state.setGrounded(false);
-
-                // Send event to allow for other systems to modify the jump force.
-                AffectJumpForceEvent affectJumpForceEvent = new AffectJumpForceEvent(movementComp.jumpSpeed);
-                entity.send(affectJumpForceEvent);
-                endVelocity.y += affectJumpForceEvent.getResultValue();
-                if (input.isFirstRun()) {
-                    entity.send(new JumpEvent());
-                }
-
-                // Send event to allow for other systems to modify the max number of jumps.
-                AffectMultiJumpEvent affectMultiJumpEvent = new AffectMultiJumpEvent(movementComp.baseNumberOfJumpsMax);
-                entity.send(affectMultiJumpEvent);
-                movementComp.numberOfJumpsMax = (int) affectMultiJumpEvent.getResultValue();
-
-                movementComp.numberOfJumpsLeft--;
-            }
         } else {
             if (moveResult.isTopHit() && endVelocity.y > 0) {
                 if (input.isFirstRun()) {
@@ -691,34 +621,10 @@ public class KinematicCharacterMover implements CharacterMover {
                     logger.debug("Hit at " + hitVelocity);
                     entity.send(new VerticalCollisionEvent(state.getPosition(), hitVelocity));
                 }
-                endVelocity.y = -0.0f * endVelocity.y;
-            }
-
-            // Jump again in mid-air only if a jump was requested and there are jumps remaining.
-            if (input.isJumpRequested() && movementComp.numberOfJumpsLeft > 0) {
-                state.setGrounded(false);
-
-                // Send event to allow for other systems to modify the jump force.
-                AffectJumpForceEvent affectJumpForceEvent = new AffectJumpForceEvent(movementComp.jumpSpeed);
-                entity.send(affectJumpForceEvent);
-                endVelocity.y += affectJumpForceEvent.getResultValue();
-                if (input.isFirstRun()) {
-                    entity.send(new JumpEvent());
-                }
-
-                // Send event to allow for other systems to modify the max number of jumps.
-                AffectMultiJumpEvent affectMultiJumpEvent = new AffectMultiJumpEvent(movementComp.baseNumberOfJumpsMax);
-                entity.send(affectMultiJumpEvent);
-                movementComp.numberOfJumpsMax = (int) affectMultiJumpEvent.getResultValue();
-
-                movementComp.numberOfJumpsLeft--;
-            }
-
-            if (state.isGrounded()) {
-                movementComp.numberOfJumpsLeft--;
-                state.setGrounded(false);
+                endVelocity.y = 0f;
             }
         }
+
         if (input.isFirstRun() && moveResult.isHorizontalHit()) {
             Vector3f hitVelocity = new Vector3f(state.getVelocity());
             hitVelocity.x += (distanceMoved.x / moveDelta.x) * (endVelocity.x - state.getVelocity().x);
@@ -727,30 +633,6 @@ public class KinematicCharacterMover implements CharacterMover {
             entity.send(new HorizontalCollisionEvent(state.getPosition(), hitVelocity));
         }
         state.getVelocity().set(endVelocity);
-        if (state.isGrounded() || movementComp.mode == MovementMode.SWIMMING || movementComp.mode == MovementMode.DIVING) {
-            state.setFootstepDelta(
-                    state.getFootstepDelta() + distanceMoved.length() / movementComp.distanceBetweenFootsteps);
-            if (state.getFootstepDelta() > 1) {
-                state.setFootstepDelta(state.getFootstepDelta() - 1);
-                if (input.isFirstRun()) {
-                    switch (movementComp.mode) {
-                        case CROUCHING:
-                        case WALKING:
-                            entity.send(new FootstepEvent());
-                            break;
-                        case DIVING:
-                        case SWIMMING:
-                            entity.send(new SwimStrokeEvent(worldProvider.getBlock(state.getPosition())));
-                            break;
-                        case CLIMBING:
-                        case FLYING:
-                        case GHOSTING:
-                        case NONE:
-                            break;
-                    }
-                }
-            }
-        }
     }
 
     private void climb(final CharacterStateEvent state, CharacterMoveInputEvent input, Vector3f desiredVelocity) {
