@@ -16,8 +16,12 @@
 package org.terasology.world.block.family;
 
 import com.google.common.collect.Maps;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.terasology.math.ChunkMath;
+import org.terasology.math.JomlUtil;
 import org.terasology.math.Rotation;
 import org.terasology.math.Side;
 import org.terasology.math.geom.Vector3i;
@@ -75,7 +79,10 @@ public class FreeformFamily extends AbstractBlockFamily implements SideDefinedBl
 
 
     @Override
-    public Block getBlockForPlacement(Vector3i location, Side attachmentSide, Side direction) {
+    public Block getBlockForPlacement(Vector3i location, Side attachmentSide, Vector3fc viewingDirection) {
+        Vector3f attachmentSideNormal = new org.joml.Vector3f(attachmentSide.direction());
+        Side direction = ChunkMath.getSecondaryPlacementDirection(JomlUtil.from(viewingDirection), JomlUtil.from(attachmentSideNormal));
+
         if (archetypeBlock == null) {
             if (attachmentSide.isHorizontal()) {
                 return blocks.get(attachmentSide);

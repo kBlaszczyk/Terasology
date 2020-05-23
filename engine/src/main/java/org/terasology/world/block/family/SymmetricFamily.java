@@ -15,6 +15,7 @@
  */
 package org.terasology.world.block.family;
 
+import org.joml.Vector3fc;
 import org.terasology.math.Side;
 import org.terasology.math.geom.Vector3i;
 import org.terasology.world.block.Block;
@@ -54,7 +55,7 @@ public class SymmetricFamily extends AbstractBlockFamily {
 
 
     @Override
-    public Block getBlockForPlacement(Vector3i location, Side attachmentSide, Side direction) {
+    public Block getBlockForPlacement(Vector3i location, Side attachmentSide, Vector3fc viewingDirection) {
         return block;
     }
 

@@ -15,8 +15,6 @@
  */
 package org.terasology.world.block.items;
 
-import org.terasology.telemetry.GamePlayStatsComponent;
-import org.terasology.utilities.Assets;
 import org.terasology.audio.AudioManager;
 import org.terasology.audio.events.PlaySoundEvent;
 import org.terasology.entitySystem.entity.EntityRef;
@@ -28,7 +26,7 @@ import org.terasology.logic.characters.KinematicCharacterMover;
 import org.terasology.logic.common.ActivateEvent;
 import org.terasology.logic.inventory.ItemComponent;
 import org.terasology.math.AABB;
-import org.terasology.math.ChunkMath;
+import org.terasology.math.JomlUtil;
 import org.terasology.math.Side;
 import org.terasology.math.geom.Vector3f;
 import org.terasology.math.geom.Vector3i;
@@ -37,6 +35,8 @@ import org.terasology.physics.Physics;
 import org.terasology.physics.StandardCollisionGroup;
 import org.terasology.registry.CoreRegistry;
 import org.terasology.registry.In;
+import org.terasology.telemetry.GamePlayStatsComponent;
+import org.terasology.utilities.Assets;
 import org.terasology.world.BlockEntityRegistry;
 import org.terasology.world.WorldProvider;
 import org.terasology.world.block.Block;
@@ -78,7 +78,6 @@ public class BlockItemSystem extends BaseComponentSystem {
         BlockItemComponent blockItem = item.getComponent(BlockItemComponent.class);
         BlockFamily type = blockItem.blockFamily;
         Side surfaceSide = Side.inDirection(event.getHitNormal());
-        Side secondaryDirection = ChunkMath.getSecondaryPlacementDirection(event.getDirection(), event.getHitNormal());
 
         BlockComponent blockComponent = event.getTarget().getComponent(BlockComponent.class);
         if (blockComponent == null) {
@@ -90,7 +89,7 @@ public class BlockItemSystem extends BaseComponentSystem {
         Vector3i placementPos = new Vector3i(targetBlock);
         placementPos.add(surfaceSide.getVector3i());
 
-        Block block = type.getBlockForPlacement(placementPos, surfaceSide, secondaryDirection);
+        Block block = type.getBlockForPlacement(placementPos, surfaceSide, JomlUtil.from(event.getDirection()));
 
         if (canPlaceBlock(block, targetBlock, placementPos)) {
             // TODO: Fix this for changes.

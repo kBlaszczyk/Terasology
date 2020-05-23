@@ -15,6 +15,7 @@
  */
 package org.terasology.world.block.family;
 
+import org.joml.Vector3fc;
 import org.terasology.assets.ResourceUrn;
 import org.terasology.math.Side;
 import org.terasology.math.geom.Vector3i;
@@ -42,12 +43,12 @@ public interface BlockFamily {
     /**
      * Get the block that is appropriate for placement in the given situation
      *
-     * @param location            The location where the block is going to be placed.
-     * @param attachmentSide      The side of the block which this block is being attached to, e.g. Top if the block is being placed on the ground
-     * @param direction           A secondary direction after the attachment side that determines the facing of the block.
+     * @param location          The location where the block is going to be placed
+     * @param attachmentSide    The side of the block which this block is being attached to, e.g. Top if the block is being placed on the ground
+     * @param viewingDirection  The player's viewing direction
      * @return The appropriate block
      */
-    Block getBlockForPlacement(Vector3i location, Side attachmentSide, Side direction);
+    Block getBlockForPlacement(Vector3i location, Side attachmentSide, Vector3fc viewingDirection);
 
     /**
      * @return The base block defining the block group. Can be used for orientation-irrelevant behaviours
