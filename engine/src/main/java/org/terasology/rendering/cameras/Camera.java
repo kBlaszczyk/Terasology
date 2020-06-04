@@ -24,7 +24,6 @@ import org.terasology.config.Config;
 import org.terasology.math.AABB;
 import org.terasology.math.Direction;
 import org.terasology.math.JomlUtil;
-import org.terasology.math.MatrixUtils;
 import org.terasology.math.geom.Quat4f;
 import org.terasology.registry.CoreRegistry;
 
@@ -64,6 +63,8 @@ public abstract class Camera {
     protected Matrix4f inverseProjectionMatrix = new Matrix4f();
     protected Matrix4f normViewMatrix = new Matrix4f();
     protected Matrix4f viewMatrix = new Matrix4f();
+    protected Matrix4f trueViewMatrix = new Matrix4f();
+    protected Matrix4f trueProjectionMatrix = new Matrix4f();
     protected Matrix4f viewProjectionMatrix = new Matrix4f();
     protected Matrix4f inverseViewProjectionMatrix = new Matrix4f();
     protected Matrix4f prevViewProjectionMatrix = new Matrix4f();
@@ -105,8 +106,8 @@ public abstract class Camera {
             return;
         }
 
-        viewFrustum.updateFrustum(MatrixUtils.matrixToFloatBuffer(viewMatrix), MatrixUtils.matrixToFloatBuffer(projectionMatrix));
-        viewFrustumReflected.updateFrustum(MatrixUtils.matrixToFloatBuffer(viewMatrixReflected), MatrixUtils.matrixToFloatBuffer(projectionMatrix));
+        viewFrustum.updateFrustum(trueViewMatrix, trueProjectionMatrix);
+        viewFrustumReflected.updateFrustum(viewMatrixReflected, projectionMatrix);
     }
 
     public abstract boolean isBobbingAllowed();

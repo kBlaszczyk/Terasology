@@ -19,12 +19,12 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-import org.terasology.math.geom.Quat4f;
-import org.terasology.rendering.openvrprovider.OpenVRProvider;
 import org.lwjgl.opengl.GL11;
 import org.terasology.config.RenderingConfig;
 import org.terasology.math.MatrixUtils;
+import org.terasology.math.geom.Quat4f;
 import org.terasology.registry.CoreRegistry;
+import org.terasology.rendering.openvrprovider.OpenVRProvider;
 import org.terasology.rendering.openvrprovider.OpenVRUtil;
 import org.terasology.rendering.world.WorldRenderer;
 import org.terasology.rendering.world.WorldRenderer.RenderingStage;
@@ -76,10 +76,10 @@ public class OpenVRStereoCamera extends SubmersibleCamera {
     public void updateFrustum() {
         super.updateFrustum();
 
-        viewFrustumLeftEye.updateFrustum(MatrixUtils.matrixToFloatBuffer(viewMatrixLeftEye), MatrixUtils.matrixToFloatBuffer(projectionMatrixLeftEye));
-        viewFrustumRightEye.updateFrustum(MatrixUtils.matrixToFloatBuffer(viewMatrixRightEye), MatrixUtils.matrixToFloatBuffer(projectionMatrixRightEye));
-        viewFrustumReflectedLeftEye.updateFrustum(MatrixUtils.matrixToFloatBuffer(viewMatrixReflectedLeftEye), MatrixUtils.matrixToFloatBuffer(projectionMatrixLeftEye));
-        viewFrustumReflectedRightEye.updateFrustum(MatrixUtils.matrixToFloatBuffer(viewMatrixReflectedRightEye), MatrixUtils.matrixToFloatBuffer(projectionMatrixRightEye));
+        viewFrustumLeftEye.updateFrustum(viewMatrixLeftEye, projectionMatrixLeftEye);
+        viewFrustumRightEye.updateFrustum(viewMatrixRightEye, projectionMatrixRightEye);
+        viewFrustumReflectedLeftEye.updateFrustum(viewMatrixReflectedLeftEye, projectionMatrixLeftEye);
+        viewFrustumReflectedRightEye.updateFrustum(viewMatrixReflectedRightEye, projectionMatrixRightEye);
     }
 
     @Override

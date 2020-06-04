@@ -148,9 +148,17 @@ public class PerspectiveCamera extends SubmersibleCamera implements PropertyChan
         tempRightVector.mul(bobbingRotationOffsetFactor);
 
         projectionMatrix = createPerspectiveProjectionMatrix(fov, getzNear(), getzFar(),this.displayDevice);
+        float aspectRatio = (float) displayDevice.getDisplayWidth() / displayDevice.getDisplayHeight();
+        float fovY = (float) (2 * Math.atan2(Math.tan(0.5 * fov * TeraMath.DEG_TO_RAD), aspectRatio));
+        trueProjectionMatrix.setPerspective(fovY, aspectRatio, getzNear(), getzFar());
 
+        Vector3f eye = new Vector3f(position).add(0f, bobbingVerticalOffsetFactor * 2.0f, 0f);
         viewMatrix = MatrixUtils.createViewMatrix(0f, bobbingVerticalOffsetFactor * 2.0f, 0f, viewingDirection.x, viewingDirection.y + bobbingVerticalOffsetFactor * 2.0f,
                 viewingDirection.z, up.x + tempRightVector.x, up.y + tempRightVector.y, up.z + tempRightVector.z);
+        trueViewMatrix.setLookAt(
+                eye.x, eye.y, eye.z, eye.x + viewingDirection.x, eye.y + viewingDirection.y + bobbingVerticalOffsetFactor * 2.0f,
+                eye.z + viewingDirection.z, up.x + tempRightVector.x, up.y + tempRightVector.y, up.z + tempRightVector.z
+        );
 
         normViewMatrix = MatrixUtils.createViewMatrix(0f, 0f, 0f, viewingDirection.x, viewingDirection.y, viewingDirection.z,
                 up.x + tempRightVector.x, up.y + tempRightVector.y, up.z + tempRightVector.z);
@@ -162,7 +170,7 @@ public class PerspectiveCamera extends SubmersibleCamera implements PropertyChan
         reflectionMatrix.mul(viewMatrix, viewMatrixReflected);
 
         reflectionMatrix.setColumn(1, new Vector4f(0.0f, -1.0f, 0.0f, 0.0f));
-        reflectionMatrix.mul(normViewMatrix,normViewMatrixReflected);
+        reflectionMatrix.mul(normViewMatrix, normViewMatrixReflected);
 
 //        viewProjectionMatrix = MatrixUtils.calcViewProjectionMatrix(viewMatrix, projectionMatrix);
         viewProjectionMatrix = new Matrix4f(viewMatrix).mul(projectionMatrix);
