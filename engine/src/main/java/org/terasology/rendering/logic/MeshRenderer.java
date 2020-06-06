@@ -15,13 +15,9 @@
  */
 package org.terasology.rendering.logic;
 
-import org.terasology.math.JomlUtil;
-import org.terasology.math.Transform;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import java.nio.FloatBuffer;
-import java.util.Arrays;
-import java.util.Set;
+import org.joml.Matrix3f;
 import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,8 +34,8 @@ import org.terasology.entitySystem.systems.RenderSystem;
 import org.terasology.logic.location.LocationComponent;
 import org.terasology.logic.players.LocalPlayer;
 import org.terasology.math.AABB;
-import org.terasology.math.MatrixUtils;
-import org.terasology.math.VecMath;
+import org.terasology.math.JomlUtil;
+import org.terasology.math.Transform;
 import org.terasology.math.geom.Matrix4f;
 import org.terasology.math.geom.Quat4f;
 import org.terasology.math.geom.Vector3f;
@@ -50,6 +46,10 @@ import org.terasology.rendering.assets.material.Material;
 import org.terasology.rendering.opengl.OpenGLMesh;
 import org.terasology.rendering.world.WorldRenderer;
 import org.terasology.world.WorldProvider;
+
+import java.nio.FloatBuffer;
+import java.util.Arrays;
+import java.util.Set;
 
 /**
  * TODO: This should be made generic (no explicit shader or mesh) and ported directly into WorldRenderer? Later note: some GelCube functionality moved to a module
@@ -219,11 +219,14 @@ public class MeshRenderer extends BaseComponentSystem implements RenderSystem {
                             lastMesh.preRender();
                         }
 
-                        Matrix4f modelViewMatrix = MatrixUtils.calcModelViewMatrix(JomlUtil.from(worldRenderer.getActiveCamera().getViewMatrix()), matrixCameraSpace);
-                        MatrixUtils.matrixToFloatBuffer(modelViewMatrix, tempMatrixBuffer44);
-                        MatrixUtils.matrixToFloatBuffer(MatrixUtils.calcNormalMatrix(modelViewMatrix), tempMatrixBuffer33);
+                        org.joml.Matrix4f modelMatrix = JomlUtil.from(matrixCameraSpace);
+                        org.joml.Matrix4fc viewMatrix = worldRenderer.getActiveCamera().getViewMatrix();
+                        org.joml.Matrix4f modelViewMatrix = viewMatrix.mul(modelMatrix, new org.joml.Matrix4f());
 
-                        material.setMatrix4("projectionMatrix", new org.joml.Matrix4f(worldRenderer.getActiveCamera().getProjectionMatrix()).transpose(), true);
+                        modelViewMatrix.get(tempMatrixBuffer44);
+                        modelViewMatrix.normal(new Matrix3f()).get(tempMatrixBuffer33);
+
+                        material.setMatrix4("projectionMatrix", worldRenderer.getActiveCamera().getProjectionMatrix(), true);
                         material.setMatrix4("worldViewMatrix", tempMatrixBuffer44, true);
                         material.setMatrix3("normalMatrix", tempMatrixBuffer33, true);
 

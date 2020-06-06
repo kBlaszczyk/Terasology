@@ -17,6 +17,7 @@ package org.terasology.rendering.cameras;
 
 import org.joml.AxisAngle4f;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -39,10 +40,11 @@ import org.terasology.registry.CoreRegistry;
 public abstract class Camera {
 
     protected static final Vector3fc FORWARD = JomlUtil.from(Direction.FORWARD.getVector3f());
+    protected static final Vector3fc UP = JomlUtil.from(Direction.UP.getVector3f());
 
     /* CAMERA PARAMETERS */
     protected final Vector3f position = new Vector3f(0, 0, 0);
-    protected final Vector3f up = JomlUtil.from(Direction.UP.getVector3f());
+    protected final Vector3f currentUp = new Vector3f(UP);
     protected final Vector3f viewingDirection = new Vector3f(FORWARD);
     protected final Vector3f viewingAxis = JomlUtil.from(Direction.LEFT.getVector3f());
     protected float viewingAngle;
@@ -63,8 +65,6 @@ public abstract class Camera {
     protected Matrix4f inverseProjectionMatrix = new Matrix4f();
     protected Matrix4f normViewMatrix = new Matrix4f();
     protected Matrix4f viewMatrix = new Matrix4f();
-    protected Matrix4f trueViewMatrix = new Matrix4f();
-    protected Matrix4f trueProjectionMatrix = new Matrix4f();
     protected Matrix4f viewProjectionMatrix = new Matrix4f();
     protected Matrix4f inverseViewProjectionMatrix = new Matrix4f();
     protected Matrix4f prevViewProjectionMatrix = new Matrix4f();
@@ -106,7 +106,7 @@ public abstract class Camera {
             return;
         }
 
-        viewFrustum.updateFrustum(trueViewMatrix, trueProjectionMatrix);
+        viewFrustum.updateFrustum(viewMatrix, projectionMatrix);
         viewFrustumReflected.updateFrustum(viewMatrixReflected, projectionMatrix);
     }
 
@@ -165,7 +165,7 @@ public abstract class Camera {
         prevViewProjectionMatrix.set(viewProjectionMatrix);
     }
 
-    public Matrix4f getViewMatrix() {
+    public Matrix4fc getViewMatrix() {
         if (!reflected) {
             return viewMatrix;
         }
@@ -181,31 +181,31 @@ public abstract class Camera {
         return normViewMatrixReflected;
     }
 
-    public Matrix4f getProjectionMatrix() {
+    public Matrix4fc getProjectionMatrix() {
         return projectionMatrix;
     }
 
-    public Matrix4f getViewProjectionMatrix() {
+    public Matrix4fc getViewProjectionMatrix() {
         return viewProjectionMatrix;
     }
 
-    public Matrix4f getInverseProjectionMatrix() {
+    public Matrix4fc getInverseProjectionMatrix() {
         return inverseProjectionMatrix;
     }
 
-    public Matrix4f getInverseViewProjectionMatrix() {
+    public Matrix4fc getInverseViewProjectionMatrix() {
         return inverseViewProjectionMatrix;
     }
 
-    public Matrix4f getPrevViewProjectionMatrix() {
+    public Matrix4fc getPrevViewProjectionMatrix() {
         return prevViewProjectionMatrix;
     }
 
-    public Vector3f getPosition() {
+    public Vector3fc getPosition() {
         return position;
     }
 
-    public Vector3f getViewingDirection() {
+    public Vector3fc getViewingDirection() {
         return viewingDirection;
     }
 

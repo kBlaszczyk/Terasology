@@ -18,16 +18,17 @@ package org.terasology.rendering.cameras;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.terasology.config.RenderingConfig;
 import org.terasology.engine.subsystem.DisplayDevice;
-import org.terasology.math.MatrixUtils;
 import org.terasology.math.TeraMath;
 import org.terasology.rendering.nui.layers.mainMenu.videoSettings.CameraSetting;
 import org.terasology.world.WorldProvider;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.nio.FloatBuffer;
 import java.util.Deque;
 import java.util.LinkedList;
 
@@ -54,6 +55,7 @@ public class PerspectiveCamera extends SubmersibleCamera implements PropertyChan
     private DisplayDevice displayDevice;
 
     private Vector3f tempRightVector = new Vector3f();
+    private final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
 
     public PerspectiveCamera(WorldProvider worldProvider, RenderingConfig renderingConfig, DisplayDevice displayDevice) {
         super(worldProvider, renderingConfig);
@@ -71,20 +73,23 @@ public class PerspectiveCamera extends SubmersibleCamera implements PropertyChan
     @Override
     public void loadProjectionMatrix() {
         glMatrixMode(GL_PROJECTION);
-        GL11.glLoadMatrix(MatrixUtils.matrixToFloatBuffer(getProjectionMatrix()));
+        matrixBuffer.clear();
+        GL11.glLoadMatrix(getProjectionMatrix().get(matrixBuffer));
         glMatrixMode(GL11.GL_MODELVIEW);
     }
 
     @Override
     public void loadModelViewMatrix() {
         glMatrixMode(GL11.GL_MODELVIEW);
-        GL11.glLoadMatrix(MatrixUtils.matrixToFloatBuffer(getViewMatrix()));
+        matrixBuffer.clear();
+        GL11.glLoadMatrix(getViewMatrix().get(matrixBuffer));
     }
 
     @Override
     public void loadNormalizedModelViewMatrix() {
         glMatrixMode(GL11.GL_MODELVIEW);
-        GL11.glLoadMatrix(MatrixUtils.matrixToFloatBuffer(getNormViewMatrix()));
+        matrixBuffer.clear();
+        GL11.glLoadMatrix(getNormViewMatrix().get(matrixBuffer));
     }
 
     @Override
@@ -144,36 +149,33 @@ public class PerspectiveCamera extends SubmersibleCamera implements PropertyChan
             return;
         }
 
-        viewingDirection.cross(up, tempRightVector);
+        viewingDirection.cross(currentUp, tempRightVector);
         tempRightVector.mul(bobbingRotationOffsetFactor);
+        currentUp.set(UP).add(tempRightVector);
 
-        projectionMatrix = createPerspectiveProjectionMatrix(fov, getzNear(), getzFar(),this.displayDevice);
         float aspectRatio = (float) displayDevice.getDisplayWidth() / displayDevice.getDisplayHeight();
         float fovY = (float) (2 * Math.atan2(Math.tan(0.5 * fov * TeraMath.DEG_TO_RAD), aspectRatio));
-        trueProjectionMatrix.setPerspective(fovY, aspectRatio, getzNear(), getzFar());
+        projectionMatrix.setPerspective(fovY, aspectRatio, getzNear(), getzFar());
 
         Vector3f eye = new Vector3f(position).add(0f, bobbingVerticalOffsetFactor * 2.0f, 0f);
-        viewMatrix = MatrixUtils.createViewMatrix(0f, bobbingVerticalOffsetFactor * 2.0f, 0f, viewingDirection.x, viewingDirection.y + bobbingVerticalOffsetFactor * 2.0f,
-                viewingDirection.z, up.x + tempRightVector.x, up.y + tempRightVector.y, up.z + tempRightVector.z);
-        trueViewMatrix.setLookAt(
-                eye.x, eye.y, eye.z, eye.x + viewingDirection.x, eye.y + viewingDirection.y + bobbingVerticalOffsetFactor * 2.0f,
-                eye.z + viewingDirection.z, up.x + tempRightVector.x, up.y + tempRightVector.y, up.z + tempRightVector.z
+        Vector3f center = new Vector3f(eye).add(viewingDirection).add(0, bobbingVerticalOffsetFactor * 2.0f, 0);
+        //Vector3f up = new Vector3f(currentUp).add(tempRightVector);
+
+        viewMatrix.setLookAt(eye, center, currentUp);
+        normViewMatrix.setLookAt(
+                position, position.add(viewingDirection, new Vector3f()), currentUp
         );
 
-        normViewMatrix = MatrixUtils.createViewMatrix(0f, 0f, 0f, viewingDirection.x, viewingDirection.y, viewingDirection.z,
-                up.x + tempRightVector.x, up.y + tempRightVector.y, up.z + tempRightVector.z);
+        reflectionMatrix.setRow(0, new Vector4f(1.0f, 0.0f, 0.0f, 0.0f));
+        reflectionMatrix.setRow(1, new Vector4f(0.0f, -1.0f, 0.0f, 2f * (-position.y + getReflectionHeight())));
+        reflectionMatrix.setRow(2, new Vector4f(0.0f, 0.0f, 1.0f, 0.0f));
+        reflectionMatrix.setRow(3, new Vector4f(0.0f, 0.0f, 0.0f, 1.0f));
+        viewMatrix.mul(reflectionMatrix, viewMatrixReflected);
 
-        reflectionMatrix.setColumn(0, new Vector4f(1.0f, 0.0f, 0.0f, 0.0f));
-        reflectionMatrix.setColumn(1, new Vector4f(0.0f, -1.0f, 0.0f, 2f * (-position.y + getReflectionHeight())));
-        reflectionMatrix.setColumn(2, new Vector4f(0.0f, 0.0f, 1.0f, 0.0f));
-        reflectionMatrix.setColumn(3, new Vector4f(0.0f, 0.0f, 0.0f, 1.0f));
-        reflectionMatrix.mul(viewMatrix, viewMatrixReflected);
+        reflectionMatrix.setRow(1, new Vector4f(0.0f, -1.0f, 0.0f, 0.0f));
+        normViewMatrix.mul(reflectionMatrix, normViewMatrixReflected);
 
-        reflectionMatrix.setColumn(1, new Vector4f(0.0f, -1.0f, 0.0f, 0.0f));
-        reflectionMatrix.mul(normViewMatrix, normViewMatrixReflected);
-
-//        viewProjectionMatrix = MatrixUtils.calcViewProjectionMatrix(viewMatrix, projectionMatrix);
-        viewProjectionMatrix = new Matrix4f(viewMatrix).mul(projectionMatrix);
+        viewProjectionMatrix.set(projectionMatrix).mul(viewMatrix);
 
         projectionMatrix.invert(inverseProjectionMatrix);
         viewProjectionMatrix.invert(inverseViewProjectionMatrix);
